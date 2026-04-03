@@ -1,0 +1,65 @@
+#portfolio
+#handle: _MUMINUL__ISLAM___
+
+#CODE
+
+
+services:
+
+#redis
+  redis:
+    image: redis:latest
+#    ports:
+#      - "6379:6379"
+
+#rabbitmq
+  rabbitmq:
+    image: rabbitmq:3-management
+#    ports:
+#    - "5672:5672"
+#    - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=celeryuser
+      - RABBITMQ_DEFAULT_PASS=celerypass
+
+#backend
+  backend:
+    build:
+      context: ./back
+
+    #ports:
+    #  - "8000:8000"
+    #  - "6000:6000"
+
+    depends_on:
+      -  redis
+      -  rabbitmq
+    environment:
+      - REDIS_CACHE_URL=redis://redis:6379/0
+      - REDIS_RATE_URL=redis://redis:6379/1
+      - REDIS_RESULT_URL=redis://redis:6379/2
+      - RABBITMQ_URL=amqp://celeryuser:celerypass@rabbitmq:5672/
+    command: >
+        bash -c "python seed.py && ./background_job_server & gunicorn -k uvicorn.workers.UvicornWorker main:app -b 0.0.0.0:8000 --workers 4 "
+
+  #celery worker
+  worker:
+    build:
+      context: ./back
+    depends_on:
+      -  backend
+      -  redis
+      -  rabbitmq
+    environment:
+      - REDIS_RESULT_URL=redis://redis:6379/2
+      - RABBITMQ_URL=amqp://celeryuser:celerypass@rabbitmq:5672/
+    command: celery -A task worker --loglevel=info
+
+  #frontend
+  frontend:
+    build:
+      context: ./front
+    ports:
+      - "80:80"
+    depends_on:
+      -  backend
