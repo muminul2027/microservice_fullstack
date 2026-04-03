@@ -1,0 +1,23 @@
+#portfolio
+#handle: _MUMINUL__ISLAM___
+
+
+#code
+FROM golang:latest AS go-builder
+WORKDIR /back
+COPY background_job.go .
+RUN go build -o background_job_server background_job.go
+
+
+FROM python:latest
+WORKDIR /back
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY ./ ./
+
+COPY --from=go-builder /back/background_job_server ./background_job_server
+
+EXPOSE 8000 6000
+
+CMD ["bash"]
